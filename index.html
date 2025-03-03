@@ -63,10 +63,11 @@
 
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), floorMaterial);
             floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -1; // Wide depth gap
             scene.add(floor);
             const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), ceilingMaterial);
             ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = 5;
+            ceiling.position.y = 6; // Wide depth gap
             scene.add(ceiling);
 
             const walls = [];
@@ -90,7 +91,7 @@
             let playerHealth = 100;
             const healthFill = document.getElementById('healthFill');
             const healthText = document.getElementById('healthText');
-            const playerHitbox = new THREE.Mesh(new THREE.BoxGeometry(0.6, 3, 0.6), debugMaterial);
+            const playerHitbox = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), debugMaterial);
             playerHitbox.position.set(-20, 1.5, -20);
             scene.add(playerHitbox);
             camera.position.copy(playerHitbox.position);
@@ -108,7 +109,7 @@
                 enemy.position.set(x, 1.5, z);
                 enemy.scale.set(3, 3, 1);
                 enemy.userData = { health: 50, speed: 0.03 };
-                const hitbox = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), debugMaterial);
+                const hitbox = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2), debugMaterial);
                 hitbox.position.copy(enemy.position);
                 enemy.userData.hitbox = hitbox;
                 enemies.push(enemy);
@@ -216,11 +217,9 @@
                 if (keys.s) { newZ += moveSpeed * Math.cos(camera.rotation.y); newX += moveSpeed * Math.sin(camera.rotation.y); }
                 if (keys.a) { newZ += moveSpeed * Math.sin(camera.rotation.y); newX -= moveSpeed * Math.cos(camera.rotation.y); }
                 if (keys.d) { newZ -= moveSpeed * Math.sin(camera.rotation.y); newX += moveSpeed * Math.cos(camera.rotation.y); }
-                if (!checkCollision(new THREE.Vector3(newX, 1.5, newZ), new THREE.Vector3(0.6, 3, 0.6))) {
-                    camera.position.x = newX;
-                    camera.position.z = newZ;
-                    playerHitbox.position.set(newX, 1.5, newZ);
-                }
+                camera.position.x = newX;
+                camera.position.z = newZ;
+                playerHitbox.position.set(newX, 1.5, newZ);
                 if (keys.space && !gameOver) { fireShot(); keys.space = false; }
                 if (keys.p) { debugLogs = !debugLogs; keys.p = false; }
                 if (keys.o) { spawnEnemy(camera.position.x + 5, camera.position.z + 5); keys.o = false; }
@@ -229,7 +228,7 @@
                     const dir = camera.position.clone().sub(enemy.position).normalize();
                     const newX = enemy.position.x + dir.x * enemy.userData.speed;
                     const newZ = enemy.position.z + dir.z * enemy.userData.speed;
-                    if (!checkCollision(new THREE.Vector3(newX, 1.5, newZ), new THREE.Vector3(1, 3, 1))) {
+                    if (!checkCollision(new THREE.Vector3(newX, 1.5, newZ), new THREE.Vector3(2, 3, 2))) {
                         enemy.position.x = newX;
                         enemy.position.z = newZ;
                         enemy.userData.hitbox.position.copy(enemy.position);
