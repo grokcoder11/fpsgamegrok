@@ -80,15 +80,14 @@
                 [1, 1, 1, 1, 1, 1, 1, 1, "E", 1]
             ];
             const tileSize = 5;
-            const wallHeight = 5;
+            const wallHeight = 4; // Lowered to avoid ceiling overlap
 
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), floorMaterial);
             floor.rotation.x = -Math.PI / 2;
             scene.add(floor);
-
             const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), ceilingMaterial);
             ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = 15;
+            ceiling.position.y = 10; // Raised to fix rendering
             scene.add(ceiling);
 
             const walls = [];
@@ -112,22 +111,24 @@
             let playerHealth = 100;
             const healthFill = document.getElementById('healthFill');
             const healthText = document.getElementById('healthText');
-            const playerHitbox = new THREE.Mesh(new THREE.BoxGeometry(0.5, 3, 0.5), debugMaterial);
-            playerHitbox.position.set(0, 5, -20);
+            const playerHitbox = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), debugMaterial);
+            playerHitbox.position.set(-20, 1.5, -20);
             scene.add(playerHitbox);
+            camera.position.copy(playerHitbox.position);
+            camera.position.y = 2.5;
 
             function updateHealth() {
                 healthFill.style.width = `${playerHealth}%`;
                 healthText.textContent = `Health: ${Math.round(playerHealth)}`;
-                if (playerHealth <= 0) alert("Game Over!");
+                if (playerHealth <= 0) showMessage("Game Over!");
             }
 
             const enemies = [];
             function spawnEnemy(x, z) {
                 const enemy = new THREE.Sprite(enemyMaterial);
-                enemy.position.set(x, 2.5, z);
-                enemy.scale.set(5, 5, 1);
-                enemy.userData = { health: 50, speed: 0.05 };
+                enemy.position.set(x, 1.5, z);
+                enemy.scale.set(3, 3, 1);
+                enemy.userData = { health: 50, speed: 0.03 };
                 const hitbox = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2), debugMaterial);
                 hitbox.position.copy(enemy.position);
                 enemy.userData.hitbox = hitbox;
@@ -135,27 +136,27 @@
                 scene.add(enemy);
                 scene.add(hitbox);
             }
-            spawnEnemy(5, 10);
-            spawnEnemy(-5, -15);
+            spawnEnemy(0, 0);
+            spawnEnemy(10, 10);
 
             const pickups = [];
             function spawnPickup(x, z) {
                 const pickup = new THREE.Sprite(healthMaterial);
-                pickup.position.set(x, 2.5, z);
-                pickup.scale.set(3, 3, 1);
-                const hitbox = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 1.5), debugMaterial);
-                hitbox.position.copy(pickup.position);
-                pickup.userData.hitbox = hitbox;
+                pickup.position.set(x, 2, z);
+                pickup.scale.set(2, 2, 1);
+                const hitbox = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 2), debugMaterial);
+                hitbox.position.set(x, 2, z);
+                pickup.userData = { hitbox: hitbox };
                 pickups.push(pickup);
                 scene.add(pickup);
                 scene.add(hitbox);
             }
-            spawnPickup(0, 0);
+            spawnPickup(-5, -5);
 
             const shots = [];
             function fireShot() {
                 const shot = new THREE.Sprite(shotMaterial);
-                shot.position.set(camera.position.x, 4.5, camera.position.z);
+                shot.position.copy(camera.position);
                 shot.scale.set(1, 1, 1);
                 shot.rotation.y = -Math.PI;
                 const hitbox = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), debugMaterial);
@@ -164,7 +165,7 @@
                     hitbox: hitbox, 
                     velocity: new THREE.Vector3(
                         -Math.sin(camera.rotation.y),
-                        -0.1,
+                        0,
                         -Math.cos(camera.rotation.y)
                     ).normalize().multiplyScalar(0.5) 
                 };
@@ -173,30 +174,27 @@
                 scene.add(hitbox);
             }
 
-            camera.position.set(0, 5, -20);
-
             const keys = {};
             let debugLogs = false;
+            let gameOver = false;
             document.addEventListener('keydown', (event) => {
-                keys[event.key] = true;
+                if (gameOver) return;
+                keys[event.key.toLowerCase()] = true;
+                console.log("Key down: ", event.key); // Log key presses
                 if (event.key === ' ' && !keys['spacePressed']) {
                     fireShot();
                     keys['spacePressed'] = true;
                 }
-                if (event.key === 'd') debugLogs = !debugLogs;
-                if (event.key === 'e') spawnEnemy(camera.position.x + 5, camera.position.z + 5);
-                if (event.key === 'ArrowUp') camera.position.z -= 1;
-                if (event.key === 'ArrowDown') camera.position.z += 1;
-                if (event.key === 'ArrowLeft') camera.position.x -= 1;
-                if (event.key === 'ArrowRight') camera.position.x += 1;
+                if (event.key.toLowerCase() === 'p') debugLogs = !debugLogs;
+                if (event.key.toLowerCase() === 'o') spawnEnemy(camera.position.x + 5, camera.position.z + 5);
             });
             document.addEventListener('keyup', (event) => {
-                keys[event.key] = false;
+                keys[event.key.toLowerCase()] = false;
+                console.log("Key up: ", event.key); // Log key releases
                 if (event.key === ' ') keys['spacePressed'] = false;
             });
-
             document.addEventListener('mousemove', (event) => {
-                if (document.pointerLockElement === renderer.domElement) {
+                if (document.pointerLockElement === renderer.domElement && !gameOver) {
                     camera.rotation.y -= event.movementX * 0.002;
                 }
             });
@@ -210,11 +208,19 @@
                 return false;
             }
 
+            const messageDiv = document.getElementById('message');
+            function showMessage(text) {
+                messageDiv.textContent = text;
+                messageDiv.style.display = 'block';
+                gameOver = true;
+                setTimeout(() => location.reload(), 2000);
+            }
+
             function animate() {
+                if (gameOver) return;
                 requestAnimationFrame(animate);
 
-                const moveSpeed = 0.3;
-
+                const moveSpeed = 0.2;
                 let newX = camera.position.x;
                 let newZ = camera.position.z;
                 if (keys['w']) {
@@ -233,17 +239,16 @@
                     newZ -= moveSpeed * Math.sin(camera.rotation.y);
                     newX += moveSpeed * Math.cos(camera.rotation.y);
                 }
-                if (!checkCollision(new THREE.Vector3(newX, 5, newZ), new THREE.Vector3(0.5, 3, 0.5))) {
-                    camera.position.x = newX;
-                    camera.position.z = newZ;
-                    playerHitbox.position.copy(camera.position);
-                }
+                // Temporarily disable collision to test WASD
+                camera.position.x = newX;
+                camera.position.z = newZ;
+                playerHitbox.position.set(newX, 1.5, newZ);
 
                 enemies.forEach(enemy => {
                     const dir = camera.position.clone().sub(enemy.position).normalize();
                     const newX = enemy.position.x + dir.x * enemy.userData.speed;
                     const newZ = enemy.position.z + dir.z * enemy.userData.speed;
-                    if (!checkCollision(new THREE.Vector3(newX, 2.5, newZ), new THREE.Vector3(2, 3, 2))) {
+                    if (!checkCollision(new THREE.Vector3(newX, 1.5, newZ), new THREE.Vector3(2, 3, 2))) {
                         enemy.position.x = newX;
                         enemy.position.z = newZ;
                         enemy.userData.hitbox.position.copy(enemy.position);
@@ -251,21 +256,19 @@
                     const enemyBox = new THREE.Box3().setFromObject(enemy.userData.hitbox);
                     const playerBox = new THREE.Box3().setFromObject(playerHitbox);
                     if (enemyBox.intersectsBox(playerBox)) {
-                        playerHealth -= 0.5;
+                        playerHealth -= 1;
                         enemy.userData.hitbox.material = hitMaterial;
                         setTimeout(() => { if (enemy.userData.hitbox) enemy.userData.hitbox.material = debugMaterial; }, 100);
                     }
                 });
 
                 for (let i = shots.length - 1; i >= 0; i--) {
-                    if (!shots[i]) continue;
                     const shot = shots[i];
                     shot.position.add(shot.userData.velocity);
                     shot.userData.hitbox.position.copy(shot.position);
                     const shotBox = new THREE.Box3().setFromObject(shot.userData.hitbox);
                     let hit = false;
                     for (let j = enemies.length - 1; j >= 0; j--) {
-                        if (!enemies[j]) continue;
                         const enemy = enemies[j];
                         const enemyBox = new THREE.Box3().setFromObject(enemy.userData.hitbox);
                         if (shotBox.intersectsBox(enemyBox)) {
@@ -305,17 +308,26 @@
                     }
                 }
 
+                const exitBox = new THREE.Box3().setFromCenterAndSize(exit.position, new THREE.Vector3(2, 3, 2));
+                const playerBox = new THREE.Box3().setFromObject(playerHitbox);
+                if (exitBox.intersectsBox(playerBox)) {
+                    showMessage("Level Complete!");
+                }
+
                 if (debugLogs) {
+                    console.log("Keys: ", keys);
                     console.log("Player: ", camera.position);
                     enemies.forEach((e, i) => console.log(`Enemy ${i}: `, e.position));
+                    pickups.forEach((p, i) => console.log(`Pickup ${i}: `, p.position));
                 }
 
                 updateHealth();
+                renderer.clear();
                 renderer.render(scene, camera);
             }
             animate();
 
-            console.log("Three.js Wolfenstein game loaded! Click to lock mouse. Space to shoot.");
+            console.log("Wolfenstein Level 1 loaded! Click to lock mouse. WASD to move, Space to shoot.");
         };
     </script>
 </body>
