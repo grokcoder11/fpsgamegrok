@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Wolfenstein Game</title>
+    <title>Wolfenstein Game - Level 1</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; }
+        body { margin: 0; overflow: hidden; background: #000; }
         canvas { width: 100%; height: 100%; cursor: none; }
         #hud { 
             position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); 
@@ -20,47 +20,68 @@
         #healthText {
             position: absolute; top: 35px; left: 10px; color: white; font-family: Arial;
         }
+        #message {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: white; font-family: Arial; font-size: 48px; text-align: center; display: none;
+        }
     </style>
 </head>
 <body>
-    <img id="hud" src="src/assets/HeroGun1.png" alt="Hero Gun">
+    <img id="hud" src="HeroGun1.png" alt="Hero Gun">
     <div id="healthBar"><div id="healthFill"></div></div>
     <div id="healthText">Health: 100</div>
+    <div id="message"></div>
     <script>
         window.onload = function() {
-            // Scene setup
             const scene = new THREE.Scene();
-            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50);
             const renderer = new THREE.WebGLRenderer();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x000000, 1);
             document.body.appendChild(renderer.domElement);
 
-            // Lock mouse
-            renderer.domElement.addEventListener('click', () => renderer.domElement.requestPointerLock());
+            renderer.domElement.addEventListener('click', () => {
+                renderer.domElement.requestPointerLock();
+                renderer.domElement.focus();
+            });
             document.addEventListener('pointerlockchange', () => {
                 if (document.pointerLockElement === renderer.domElement) console.log("Mouse locked!");
             });
 
-            // Load textures
             const wallTexture = new THREE.TextureLoader().load('wall-texture.jpg');
             const floorTexture = new THREE.TextureLoader().load('floor-texture.jpg');
             const enemyTexture = new THREE.TextureLoader().load('EnemyFuzzyGrayAlien.png');
             const shotTexture = new THREE.TextureLoader().load('shot.png');
             const healthTexture = new THREE.TextureLoader().load('PowerupHealth.png');
+            const exitTexture = new THREE.TextureLoader().load('exit-door.png');
 
             wallTexture.wrapS = wallTexture.wrapT = THREE.RepeatWrapping;
 
             const wallMaterial = new THREE.MeshBasicMaterial({ map: wallTexture, side: THREE.DoubleSide });
             const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
-            const ceilingMaterial = new THREE.MeshBasicMaterial({ map: wallTexture });
+            const ceilingMaterial = new THREE.MeshBasicMaterial({ color: 0x555555 });
             const enemyMaterial = new THREE.SpriteMaterial({ map: enemyTexture });
             const shotMaterial = new THREE.SpriteMaterial({ map: shotTexture });
             const healthMaterial = new THREE.SpriteMaterial({ map: healthTexture });
+            const exitMaterial = new THREE.SpriteMaterial({ map: exitTexture });
             const debugMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
             const hitMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
-            const shotPathMaterial = new THREE.LineBasicMaterial({ color: 0xffff00 });
 
-            // Floor/Ceiling (50x50)
+            const map = [
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 0, 0, 0, 1, 0, 1, 0, 0, 1],
+                [1, 0, 1, 0, 1, 0, 0, 0, 1, 1],
+                [1, 0, 1, 0, 0, 0, 1, 0, 0, 1],
+                [1, 0, 1, 1, 1, 0, 1, 1, 0, 1],
+                [1, 0, 0, 0, 1, 0, 0, 1, 0, 1],
+                [1, 1, 1, 0, 1, 1, 0, 1, 0, 1],
+                [1, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+                [1, 0, 1, 1, 1, 1, 0, 0, 0, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, "E", 1]
+            ];
+            const tileSize = 5;
+            const wallHeight = 5;
+
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), floorMaterial);
             floor.rotation.x = -Math.PI / 2;
             scene.add(floor);
@@ -70,30 +91,24 @@
             ceiling.position.y = 15;
             scene.add(ceiling);
 
-            // Walls
             const walls = [];
-            const wallHeight = 15;
-            const baseWidth = 10;
+            let exit;
+            for (let z = 0; z < 10; z++) {
+                for (let x = 0; x < 10; x++) {
+                    if (map[z][x] === 1) {
+                        const wall = new THREE.Mesh(new THREE.BoxGeometry(tileSize, wallHeight, tileSize), wallMaterial);
+                        wall.position.set(x * tileSize - 22.5, wallHeight / 2, z * tileSize - 22.5);
+                        walls.push(wall);
+                        scene.add(wall);
+                    } else if (map[z][x] === "E") {
+                        exit = new THREE.Sprite(exitMaterial);
+                        exit.position.set(x * tileSize - 22.5, wallHeight / 2, z * tileSize - 22.5);
+                        exit.scale.set(3, 3, 1);
+                        scene.add(exit);
+                    }
+                }
+            }
 
-            wallTexture.repeat.set(50 / baseWidth, 5);
-            walls.push(new THREE.Mesh(new THREE.BoxGeometry(50, wallHeight, 0.2), wallMaterial));
-            walls[0].position.set(0, wallHeight / 2, -25); // Front
-            walls.push(new THREE.Mesh(new THREE.BoxGeometry(50, wallHeight, 0.2), wallMaterial));
-            walls[1].position.set(0, wallHeight / 2, 25); // Back
-            walls.push(new THREE.Mesh(new THREE.BoxGeometry(50, wallHeight, 0.2), wallMaterial));
-            walls[2].position.set(-25, wallHeight / 2, 0);
-            walls[2].rotation.y = Math.PI / 2; // Left
-            walls.push(new THREE.Mesh(new THREE.BoxGeometry(50, wallHeight, 0.2), wallMaterial));
-            walls[3].position.set(25, wallHeight / 2, 0);
-            walls[3].rotation.y = Math.PI / 2; // Right
-
-            wallTexture.repeat.set(10 / baseWidth, 5);
-            walls.push(new THREE.Mesh(new THREE.BoxGeometry(10, wallHeight, 0.2), wallMaterial));
-            walls[4].position.set(-10, wallHeight / 2, -10); // Inner wall
-
-            walls.forEach(wall => scene.add(wall));
-
-            // Player
             let playerHealth = 100;
             const healthFill = document.getElementById('healthFill');
             const healthText = document.getElementById('healthText');
@@ -107,7 +122,6 @@
                 if (playerHealth <= 0) alert("Game Over!");
             }
 
-            // Enemies
             const enemies = [];
             function spawnEnemy(x, z) {
                 const enemy = new THREE.Sprite(enemyMaterial);
@@ -124,28 +138,26 @@
             spawnEnemy(5, 10);
             spawnEnemy(-5, -15);
 
-            // Pickups
             const pickups = [];
             function spawnPickup(x, z) {
                 const pickup = new THREE.Sprite(healthMaterial);
-                pickup.position.set(x, 3, z); // Sprite at y = 3
+                pickup.position.set(x, 2.5, z);
                 pickup.scale.set(3, 3, 1);
-                const hitbox = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 2), debugMaterial); // Hitbox 2x taller
-                hitbox.position.set(x, 2, z); // Centered at y = 2
-                pickup.userData = { hitbox: hitbox };
+                const hitbox = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 1.5), debugMaterial);
+                hitbox.position.copy(pickup.position);
+                pickup.userData.hitbox = hitbox;
                 pickups.push(pickup);
                 scene.add(pickup);
                 scene.add(hitbox);
             }
             spawnPickup(0, 0);
 
-            // Shots
             const shots = [];
             function fireShot() {
                 const shot = new THREE.Sprite(shotMaterial);
                 shot.position.set(camera.position.x, 4.5, camera.position.z);
                 shot.scale.set(1, 1, 1);
-                shot.rotation.y = -Math.PI; // Reverted to original, assuming image is rotated
+                shot.rotation.y = -Math.PI;
                 const hitbox = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), debugMaterial);
                 hitbox.position.copy(shot.position);
                 shot.userData = { 
@@ -156,22 +168,13 @@
                         -Math.cos(camera.rotation.y)
                     ).normalize().multiplyScalar(0.5) 
                 };
-                const pathGeometry = new THREE.BufferGeometry().setFromPoints([
-                    shot.position.clone(),
-                    shot.position.clone().add(shot.userData.velocity.clone().multiplyScalar(50))
-                ]);
-                const pathLine = new THREE.Line(pathGeometry, shotPathMaterial);
-                shot.userData.pathLine = pathLine;
                 shots.push(shot);
                 scene.add(shot);
                 scene.add(hitbox);
-                scene.add(pathLine);
             }
 
-            // Camera
             camera.position.set(0, 5, -20);
 
-            // Controls
             const keys = {};
             let debugLogs = false;
             document.addEventListener('keydown', (event) => {
@@ -180,8 +183,8 @@
                     fireShot();
                     keys['spacePressed'] = true;
                 }
-                if (event.key === 'p') debugLogs = !debugLogs; // Debug toggle
-                if (event.key === 'o') spawnEnemy(camera.position.x + 5, camera.position.z + 5); // Spawn enemy
+                if (event.key === 'd') debugLogs = !debugLogs;
+                if (event.key === 'e') spawnEnemy(camera.position.x + 5, camera.position.z + 5);
                 if (event.key === 'ArrowUp') camera.position.z -= 1;
                 if (event.key === 'ArrowDown') camera.position.z += 1;
                 if (event.key === 'ArrowLeft') camera.position.x -= 1;
@@ -198,7 +201,6 @@
                 }
             });
 
-            // Collision detection
             function checkCollision(pos, size) {
                 const box = new THREE.Box3().setFromCenterAndSize(pos, size);
                 for (const wall of walls) {
@@ -213,7 +215,6 @@
 
                 const moveSpeed = 0.3;
 
-                // Player movement
                 let newX = camera.position.x;
                 let newZ = camera.position.z;
                 if (keys['w']) {
@@ -238,7 +239,6 @@
                     playerHitbox.position.copy(camera.position);
                 }
 
-                // Enemy movement
                 enemies.forEach(enemy => {
                     const dir = camera.position.clone().sub(enemy.position).normalize();
                     const newX = enemy.position.x + dir.x * enemy.userData.speed;
@@ -257,16 +257,11 @@
                     }
                 });
 
-                // Shots
                 for (let i = shots.length - 1; i >= 0; i--) {
                     if (!shots[i]) continue;
                     const shot = shots[i];
                     shot.position.add(shot.userData.velocity);
                     shot.userData.hitbox.position.copy(shot.position);
-                    shot.userData.pathLine.geometry.setFromPoints([
-                        shot.position.clone(),
-                        shot.position.clone().add(shot.userData.velocity.clone().multiplyScalar(50))
-                    ]);
                     const shotBox = new THREE.Box3().setFromObject(shot.userData.hitbox);
                     let hit = false;
                     for (let j = enemies.length - 1; j >= 0; j--) {
@@ -278,7 +273,6 @@
                             enemy.userData.hitbox.material = hitMaterial;
                             setTimeout(() => { if (enemy.userData.hitbox) enemy.userData.hitbox.material = debugMaterial; }, 100);
                             scene.remove(shot.userData.hitbox);
-                            scene.remove(shot.userData.pathLine);
                             scene.remove(shot);
                             shots.splice(i, 1);
                             if (enemy.userData.health <= 0) {
@@ -292,19 +286,16 @@
                     }
                     if (!hit && shot.position.distanceTo(camera.position) > 50) {
                         scene.remove(shot.userData.hitbox);
-                        scene.remove(shot.userData.pathLine);
                         scene.remove(shot);
                         shots.splice(i, 1);
                     }
                 }
 
-                // Pickups
                 for (let i = pickups.length - 1; i >= 0; i--) {
                     const pickup = pickups[i];
                     const pickupBox = new THREE.Box3().setFromObject(pickup.userData.hitbox);
                     const playerBox = new THREE.Box3().setFromObject(playerHitbox);
                     if (pickupBox.intersectsBox(playerBox)) {
-                        console.log("Pickup collided!"); // Debug log
                         playerHealth = Math.min(100, playerHealth + 20);
                         pickup.userData.hitbox.material = hitMaterial;
                         setTimeout(() => { if (pickup.userData.hitbox) pickup.userData.hitbox.material = debugMaterial; }, 100);
@@ -314,11 +305,9 @@
                     }
                 }
 
-                // Debug logs
                 if (debugLogs) {
                     console.log("Player: ", camera.position);
                     enemies.forEach((e, i) => console.log(`Enemy ${i}: `, e.position));
-                    pickups.forEach((p, i) => console.log(`Pickup ${i}: `, p.position, p.userData.hitbox.position));
                 }
 
                 updateHealth();
