@@ -6,24 +6,11 @@
     <style>
         body { margin: 0; overflow: hidden; background: #000; }
         canvas { width: 100%; height: 100%; cursor: none; }
-        #hud { 
-            position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); 
-            width: 800px; height: auto; pointer-events: none; 
-        }
-        #healthBar { 
-            position: absolute; top: 10px; left: 10px; width: 200px; height: 20px; 
-            background: #333; border: 2px solid #fff; 
-        }
-        #healthFill { 
-            width: 100%; height: 100%; background: #f00; 
-        }
-        #healthText {
-            position: absolute; top: 35px; left: 10px; color: white; font-family: Arial;
-        }
-        #message {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: white; font-family: Arial; font-size: 48px; text-align: center; display: none;
-        }
+        #hud { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 800px; height: auto; pointer-events: none; }
+        #healthBar { position: absolute; top: 10px; left: 10px; width: 200px; height: 20px; background: #333; border: 2px solid #fff; }
+        #healthFill { width: 100%; height: 100%; background: #f00; }
+        #healthText { position: absolute; top: 35px; left: 10px; color: white; font-family: Arial; }
+        #message { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-family: Arial; font-size: 48px; text-align: center; display: none; }
     </style>
 </head>
 <body>
@@ -57,9 +44,7 @@
             const exitTexture = new THREE.TextureLoader().load('exit-door.png');
 
             wallTexture.wrapS = wallTexture.wrapT = THREE.RepeatWrapping;
-            wallTexture.repeat.set(10, 1); // Repeat texture for ceiling
             floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
-            floorTexture.repeat.set(10, 10);
 
             const wallMaterial = new THREE.MeshBasicMaterial({ map: wallTexture, side: THREE.DoubleSide });
             const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
@@ -88,12 +73,16 @@
 
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), floorMaterial);
             floor.rotation.x = -Math.PI / 2;
-            floor.position.y = 0; // Reset to ground
+            floor.position.y = 0;
             scene.add(floor);
-            const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), ceilingMaterial);
-            ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = 4.5; // Above walls, no overlap
-            scene.add(ceiling);
+            for (let z = 0; z < 10; z++) {
+                for (let x = 0; x < 10; x++) {
+                    const ceilingTile = new THREE.Mesh(new THREE.PlaneGeometry(tileSize, tileSize), ceilingMaterial);
+                    ceilingTile.rotation.x = Math.PI / 2;
+                    ceilingTile.position.set(x * tileSize - 22.5, 4.5, z * tileSize - 22.5);
+                    scene.add(ceilingTile);
+                }
+            }
 
             const walls = [];
             let exit;
@@ -168,39 +157,45 @@
                 hitbox.position.copy(shot.position);
                 shot.userData = { 
                     hitbox: hitbox, 
-                    velocity: new THREE.Vector3(
-                        -Math.sin(camera.rotation.y),
-                        0,
-                        -Math.cos(camera.rotation.y)
-                    ).normalize().multiplyScalar(0.5) 
+                    velocity: new THREE.Vector3(-Math.sin(camera.rotation.y), 0, -Math.cos(camera.rotation.y)).normalize().multiplyScalar(0.5) 
                 };
                 shots.push(shot);
                 scene.add(shot);
                 scene.add(hitbox);
             }
 
-            const keys = {};
+            const keys = { w: false, a: false, s: false, d: false, space: false, p: false, o: false };
             let debugLogs = false;
             let gameOver = false;
-            document.addEventListener('keydown', (event) => {
+
+            document.addEventListener('keydown', (e) => {
                 if (gameOver) return;
-                keys[event.key.toLowerCase()] = true;
-                console.log("Key down: ", event.key);
-                if (event.key === ' ' && !keys['spacePressed']) {
-                    fireShot();
-                    keys['spacePressed'] = true;
+                switch (e.key.toLowerCase()) {
+                    case 'w': keys.w = true; break;
+                    case 'a': keys.a = true; break;
+                    case 's': keys.s = true; break;
+                    case 'd': keys.d = true; break;
+                    case ' ': keys.space = true; break;
+                    case 'p': keys.p = true; break;
+                    case 'o': keys.o = true; break;
                 }
-                if (event.key.toLowerCase() === 'p') debugLogs = !debugLogs;
-                if (event.key.toLowerCase() === 'o') spawnEnemy(camera.position.x + 5, camera.position.z + 5);
+                console.log("Key down:", e.key);
             });
-            document.addEventListener('keyup', (event) => {
-                keys[event.key.toLowerCase()] = false;
-                console.log("Key up: ", event.key);
-                if (event.key === ' ') keys['spacePressed'] = false;
+            document.addEventListener('keyup', (e) => {
+                switch (e.key.toLowerCase()) {
+                    case 'w': keys.w = false; break;
+                    case 'a': keys.a = false; break;
+                    case 's': keys.s = false; break;
+                    case 'd': keys.d = false; break;
+                    case ' ': keys.space = false; break;
+                    case 'p': keys.p = false; break;
+                    case 'o': keys.o = false; break;
+                }
+                console.log("Key up:", e.key);
             });
-            document.addEventListener('mousemove', (event) => {
+            document.addEventListener('mousemove', (e) => {
                 if (document.pointerLockElement === renderer.domElement && !gameOver) {
-                    camera.rotation.y -= event.movementX * 0.002;
+                    camera.rotation.y -= e.movementX * 0.002;
                 }
             });
 
@@ -209,7 +204,7 @@
                 for (const wall of walls) {
                     const wallBox = new THREE.Box3().setFromObject(wall);
                     if (box.intersectsBox(wallBox)) {
-                        if (debugLogs) console.log("Collision at: ", wall.position);
+                        if (debugLogs) console.log("Collision at:", wall.position);
                         return true;
                     }
                 }
@@ -231,22 +226,13 @@
                 const moveSpeed = 0.2;
                 let newX = camera.position.x;
                 let newZ = camera.position.z;
-                if (keys['w']) {
-                    newZ -= moveSpeed * Math.cos(camera.rotation.y);
-                    newX -= moveSpeed * Math.sin(camera.rotation.y);
-                }
-                if (keys['s']) {
-                    newZ += moveSpeed * Math.cos(camera.rotation.y);
-                    newX += moveSpeed * Math.sin(camera.rotation.y);
-                }
-                if (keys['a']) {
-                    newZ += moveSpeed * Math.sin(camera.rotation.y);
-                    newX -= moveSpeed * Math.cos(camera.rotation.y);
-                }
-                if (keys['d']) {
-                    newZ -= moveSpeed * Math.sin(camera.rotation.y);
-                    newX += moveSpeed * Math.cos(camera.rotation.y);
-                }
+                if (keys.w) { newZ -= moveSpeed * Math.cos(camera.rotation.y); newX -= moveSpeed * Math.sin(camera.rotation.y); }
+                if (keys.s) { newZ += moveSpeed * Math.cos(camera.rotation.y); newX += moveSpeed * Math.sin(camera.rotation.y); }
+                if (keys.a) { newZ += moveSpeed * Math.sin(camera.rotation.y); newX -= moveSpeed * Math.cos(camera.rotation.y); }
+                if (keys.d) { newZ -= moveSpeed * Math.sin(camera.rotation.y); newX += moveSpeed * Math.cos(camera.rotation.y); }
+                if (keys.space && !gameOver) { fireShot(); keys.space = false; }
+                if (keys.p) { debugLogs = !debugLogs; keys.p = false; }
+                if (keys.o) { spawnEnemy(camera.position.x + 5, camera.position.z + 5); keys.o = false; }
                 if (!checkCollision(new THREE.Vector3(newX, 1.5, newZ), new THREE.Vector3(0.8, 3, 0.8))) {
                     camera.position.x = newX;
                     camera.position.z = newZ;
@@ -319,15 +305,13 @@
 
                 const exitBox = new THREE.Box3().setFromCenterAndSize(exit.position, new THREE.Vector3(2, 3, 2));
                 const playerBox = new THREE.Box3().setFromObject(playerHitbox);
-                if (exitBox.intersectsBox(playerBox)) {
-                    showMessage("Level Complete!");
-                }
+                if (exitBox.intersectsBox(playerBox)) showMessage("Level Complete!");
 
                 if (debugLogs) {
-                    console.log("Keys: ", keys);
-                    console.log("Player: ", camera.position);
-                    enemies.forEach((e, i) => console.log(`Enemy ${i}: `, e.position));
-                    pickups.forEach((p, i) => console.log(`Pickup ${i}: `, p.position));
+                    console.log("Keys:", keys);
+                    console.log("Player:", camera.position);
+                    enemies.forEach((e, i) => console.log(`Enemy ${i}:`, e.position));
+                    pickups.forEach((p, i) => console.log(`Pickup ${i}:`, p.position));
                 }
 
                 updateHealth();
