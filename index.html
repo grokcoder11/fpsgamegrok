@@ -22,7 +22,7 @@
         window.onload = function() {
             const scene = new THREE.Scene();
             const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50);
-            const renderer = new THREE.WebGLRenderer();
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setClearColor(0x000000, 1);
             document.body.appendChild(renderer.domElement);
@@ -30,13 +30,11 @@
             renderer.domElement.addEventListener('click', () => {
                 renderer.domElement.requestPointerLock();
                 renderer.domElement.focus();
+                bindControls(); // Rebind post-lock
                 console.log("Canvas clicked, pointer locked");
             });
             document.addEventListener('pointerlockchange', () => {
-                if (document.pointerLockElement === renderer.domElement) {
-                    console.log("Mouse locked!");
-                    renderer.domElement.focus();
-                }
+                if (document.pointerLockElement === renderer.domElement) console.log("Mouse locked!");
             });
 
             const wallTexture = new THREE.TextureLoader().load('wall-texture.jpg');
@@ -78,11 +76,11 @@
 
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), floorMaterial);
             floor.rotation.x = -Math.PI / 2;
-            floor.position.y = 0;
+            floor.position.y = -0.01; // Depth offset
             scene.add(floor);
             const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), ceilingMaterial);
             ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = 4.5;
+            ceiling.position.y = 4.01; // Depth offset
             scene.add(ceiling);
 
             const walls = [];
@@ -168,29 +166,26 @@
             const keys = {};
             let debugLogs = false;
             let gameOver = false;
-            document.addEventListener('keydown', (e) => {
-                if (gameOver) return;
-                switch (e.keyCode) {
-                    case 87: keys['w'] = true; break; // W
-                    case 83: keys['s'] = true; break; // S
-                    case 65: keys['a'] = true; break; // A
-                    case 68: keys['d'] = true; break; // D
-                    case 32: if (!keys['spacePressed']) { fireShot(); keys['spacePressed'] = true; } break; // Space
-                    case 80: debugLogs = !debugLogs; break; // P
-                    case 79: spawnEnemy(camera.position.x + 5, camera.position.z + 5); break; // O
-                }
-                console.log("Key down:", e.keyCode);
-            });
-            document.addEventListener('keyup', (e) => {
-                switch (e.keyCode) {
-                    case 87: keys['w'] = false; break;
-                    case 83: keys['s'] = false; break;
-                    case 65: keys['a'] = false; break;
-                    case 68: keys['d'] = false; break;
-                    case 32: keys['spacePressed'] = false; break;
-                }
-                console.log("Key up:", e.keyCode);
-            });
+
+            function bindControls() {
+                document.onkeydown = (e) => {
+                    if (gameOver) return;
+                    keys[e.key.toLowerCase()] = true;
+                    console.log("Key down:", e.key);
+                    if (e.key === ' ' && !keys['spacePressed']) {
+                        fireShot();
+                        keys['spacePressed'] = true;
+                    }
+                    if (e.key.toLowerCase() === 'p') debugLogs = !debugLogs;
+                    if (e.key.toLowerCase() === 'o') spawnEnemy(camera.position.x + 5, camera.position.z + 5);
+                };
+                document.onkeyup = (e) => {
+                    keys[e.key.toLowerCase()] = false;
+                    console.log("Key up:", e.key);
+                    if (e.key === ' ') keys['spacePressed'] = false;
+                };
+            }
+
             document.addEventListener('mousemove', (e) => {
                 if (document.pointerLockElement === renderer.domElement && !gameOver) {
                     camera.rotation.y -= e.movementX * 0.002;
