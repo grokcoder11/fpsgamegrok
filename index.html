@@ -6,24 +6,11 @@
     <style>
         body { margin: 0; overflow: hidden; background: #000; }
         canvas { width: 100%; height: 100%; cursor: none; }
-        #hud { 
-            position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); 
-            width: 800px; height: auto; pointer-events: none; 
-        }
-        #healthBar { 
-            position: absolute; top: 10px; left: 10px; width: 200px; height: 20px; 
-            background: #333; border: 2px solid #fff; 
-        }
-        #healthFill { 
-            width: 100%; height: 100%; background: #f00; 
-        }
-        #healthText {
-            position: absolute; top: 35px; left: 10px; color: white; font-family: Arial;
-        }
-        #message {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: white; font-family: Arial; font-size: 48px; text-align: center; display: none;
-        }
+        #hud { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 800px; height: auto; pointer-events: none; }
+        #healthBar { position: absolute; top: 10px; left: 10px; width: 200px; height: 20px; background: #333; border: 2px solid #fff; }
+        #healthFill { width: 100%; height: 100%; background: #f00; }
+        #healthText { position: absolute; top: 35px; left: 10px; color: white; font-family: Arial; }
+        #message { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-family: Arial; font-size: 48px; text-align: center; display: none; }
     </style>
 </head>
 <body>
@@ -43,6 +30,7 @@
             renderer.domElement.addEventListener('click', () => {
                 renderer.domElement.requestPointerLock();
                 renderer.domElement.focus();
+                console.log("Canvas clicked, pointer locked");
             });
             document.addEventListener('pointerlockchange', () => {
                 if (document.pointerLockElement === renderer.domElement) console.log("Mouse locked!");
@@ -84,10 +72,11 @@
 
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), floorMaterial);
             floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -0.01; // Depth offset
             scene.add(floor);
             const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), ceilingMaterial);
             ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = 5;
+            ceiling.position.y = 4.01; // Depth offset
             scene.add(ceiling);
 
             const walls = [];
@@ -129,8 +118,8 @@
                 enemy.position.set(x, 1.5, z);
                 enemy.scale.set(3, 3, 1);
                 enemy.userData = { health: 50, speed: 0.03 };
-                const hitbox = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2), debugMaterial);
-                hitbox.position.set(x, 1.5, z);
+                const hitbox = new THREE.Mesh(new THREE.BoxGeometry(1, 3, 1), debugMaterial);
+                hitbox.position.copy(enemy.position);
                 enemy.userData.hitbox = hitbox;
                 enemies.push(enemy);
                 scene.add(enemy);
@@ -163,11 +152,7 @@
                 hitbox.position.copy(shot.position);
                 shot.userData = { 
                     hitbox: hitbox, 
-                    velocity: new THREE.Vector3(
-                        -Math.sin(camera.rotation.y),
-                        0,
-                        -Math.cos(camera.rotation.y)
-                    ).normalize().multiplyScalar(0.5) 
+                    velocity: new THREE.Vector3(-Math.sin(camera.rotation.y), 0, -Math.cos(camera.rotation.y)).normalize().multiplyScalar(0.5) 
                 };
                 shots.push(shot);
                 scene.add(shot);
@@ -197,16 +182,13 @@
                 }
             });
 
-            function checkCollision(pos, size) {
-                const box = new THREE.Box3().setFromCenterAndSize(pos, size);
-                for (const wall of walls) {
-                    const wallBox = new THREE.Box3().setFromObject(wall);
-                    if (box.intersectsBox(wallBox)) {
-                        if (debugLogs) console.log("Collision with wall at: ", wall.position);
-                        return true;
-                    }
-                }
-                return false;
+            const raycaster = new THREE.Raycaster();
+            function checkCollisionRaycast(position, direction) {
+                raycaster.set(position, direction);
+                raycaster.near = 0;
+                raycaster.far = 2; // Short range to detect walls
+                const intersects = raycaster.intersectObjects(walls);
+                return intersects.length > 0;
             }
 
             const messageDiv = document.getElementById('message');
@@ -224,32 +206,27 @@
                 const moveSpeed = 0.2;
                 let newX = camera.position.x;
                 let newZ = camera.position.z;
-                if (keys['w']) {
-                    newZ -= moveSpeed * Math.cos(camera.rotation.y);
-                    newX -= moveSpeed * Math.sin(camera.rotation.y);
+                let direction = new THREE.Vector3();
+                if (keys['w']) direction.set(-Math.sin(camera.rotation.y), 0, -Math.cos(camera.rotation.y));
+                if (keys['s']) direction.set(Math.sin(camera.rotation.y), 0, Math.cos(camera.rotation.y));
+                if (keys['a']) direction.set(Math.cos(camera.rotation.y), 0, -Math.sin(camera.rotation.y));
+                if (keys['d']) direction.set(-Math.cos(camera.rotation.y), 0, Math.sin(camera.rotation.y));
+                if (direction.length() > 0) {
+                    direction.normalize();
+                    newX += direction.x * moveSpeed;
+                    newZ += direction.z * moveSpeed;
+                    if (!checkCollisionRaycast(new THREE.Vector3(camera.position.x, 1.5, camera.position.z), direction)) {
+                        camera.position.x = newX;
+                        camera.position.z = newZ;
+                        playerHitbox.position.set(newX, 1.5, newZ);
+                    }
                 }
-                if (keys['s']) {
-                    newZ += moveSpeed * Math.cos(camera.rotation.y);
-                    newX += moveSpeed * Math.sin(camera.rotation.y);
-                }
-                if (keys['a']) {
-                    newZ += moveSpeed * Math.sin(camera.rotation.y);
-                    newX -= moveSpeed * Math.cos(camera.rotation.y);
-                }
-                if (keys['d']) {
-                    newZ -= moveSpeed * Math.sin(camera.rotation.y);
-                    newX += moveSpeed * Math.cos(camera.rotation.y);
-                }
-                // Collision disabled here - you could walk through walls
-                camera.position.x = newX;
-                camera.position.z = newZ;
-                playerHitbox.position.set(newX, 1.5, newZ);
 
                 enemies.forEach(enemy => {
                     const dir = camera.position.clone().sub(enemy.position).normalize();
                     const newX = enemy.position.x + dir.x * enemy.userData.speed;
                     const newZ = enemy.position.z + dir.z * enemy.userData.speed;
-                    if (!checkCollision(new THREE.Vector3(newX, 1.5, newZ), new THREE.Vector3(2, 3, 2))) {
+                    if (!checkCollisionRaycast(enemy.position, dir)) {
                         enemy.position.x = newX;
                         enemy.position.z = newZ;
                         enemy.userData.hitbox.position.copy(enemy.position);
