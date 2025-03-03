@@ -63,11 +63,11 @@
 
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), floorMaterial);
             floor.rotation.x = -Math.PI / 2;
-            floor.position.y = -0.01; // Slight depth offset
+            floor.position.y = -0.01; // Slight offset
             scene.add(floor);
             const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), ceilingMaterial);
             ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = 4; // Flush with wall tops
+            ceiling.position.y = 4; // Flush with walls
             scene.add(ceiling);
 
             const walls = [];
