@@ -43,6 +43,7 @@
             renderer.domElement.addEventListener('click', () => {
                 renderer.domElement.requestPointerLock();
                 renderer.domElement.focus();
+                console.log("Canvas clicked, pointer locked");
             });
             document.addEventListener('pointerlockchange', () => {
                 if (document.pointerLockElement === renderer.domElement) console.log("Mouse locked!");
@@ -59,7 +60,7 @@
 
             const wallMaterial = new THREE.MeshBasicMaterial({ map: wallTexture, side: THREE.DoubleSide });
             const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
-            const ceilingMaterial = new THREE.MeshBasicMaterial({ map: wallTexture }); // Textured ceiling
+            const ceilingMaterial = new THREE.MeshBasicMaterial({ map: wallTexture });
             const enemyMaterial = new THREE.SpriteMaterial({ map: enemyTexture });
             const shotMaterial = new THREE.SpriteMaterial({ map: shotTexture });
             const healthMaterial = new THREE.SpriteMaterial({ map: healthTexture });
@@ -84,10 +85,11 @@
 
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), floorMaterial);
             floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -0.01; // Slight offset to avoid z-fighting
             scene.add(floor);
             const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), ceilingMaterial);
             ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = 5; // Matches wall height + buffer
+            ceiling.position.y = 4.01; // Slight buffer above walls
             scene.add(ceiling);
 
             const walls = [];
@@ -111,7 +113,7 @@
             let playerHealth = 100;
             const healthFill = document.getElementById('healthFill');
             const healthText = document.getElementById('healthText');
-            const playerHitbox = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3, 0.8), debugMaterial); // Smaller hitbox
+            const playerHitbox = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3, 0.8), debugMaterial);
             playerHitbox.position.set(-20, 1.5, -20);
             scene.add(playerHitbox);
             camera.position.copy(playerHitbox.position);
@@ -128,8 +130,8 @@
                 const enemy = new THREE.Sprite(enemyMaterial);
                 enemy.position.set(x, 1.5, z);
                 enemy.scale.set(3, 3, 1);
-                enemy.userData = { health: 50, speed: 0.05 }; // Increased speed
-                const hitbox = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1.5), debugMaterial); // Adjusted hitbox
+                enemy.userData = { health: 50, speed: 0.05 };
+                const hitbox = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1.5), debugMaterial);
                 hitbox.position.copy(enemy.position);
                 enemy.userData.hitbox = hitbox;
                 enemies.push(enemy);
@@ -142,7 +144,7 @@
             const pickups = [];
             function spawnPickup(x, z) {
                 const pickup = new THREE.Sprite(healthMaterial);
-                pickup.position.set(x, 1.5, z); // Lowered to match ground
+                pickup.position.set(x, 1.5, z);
                 pickup.scale.set(2, 2, 1);
                 const hitbox = new THREE.Mesh(new THREE.BoxGeometry(2, 4, 2), debugMaterial);
                 hitbox.position.set(x, 2, z);
@@ -326,7 +328,7 @@
                 }
 
                 updateHealth();
-                renderer.clear();
+                renderer.clear(true, true, true); // Full clear to stop flashing
                 renderer.render(scene, camera);
             }
             animate();
