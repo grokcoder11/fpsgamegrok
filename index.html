@@ -6,11 +6,24 @@
     <style>
         body { margin: 0; overflow: hidden; background: #000; }
         canvas { width: 100%; height: 100%; cursor: none; }
-        #hud { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 800px; height: auto; pointer-events: none; }
-        #healthBar { position: absolute; top: 10px; left: 10px; width: 200px; height: 20px; background: #333; border: 2px solid #fff; }
-        #healthFill { width: 100%; height: 100%; background: #f00; }
-        #healthText { position: absolute; top: 35px; left: 10px; color: white; font-family: Arial; }
-        #message { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-family: Arial; font-size: 48px; text-align: center; display: none; }
+        #hud { 
+            position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); 
+            width: 800px; height: auto; pointer-events: none; 
+        }
+        #healthBar { 
+            position: absolute; top: 10px; left: 10px; width: 200px; height: 20px; 
+            background: #333; border: 2px solid #fff; 
+        }
+        #healthFill { 
+            width: 100%; height: 100%; background: #f00; 
+        }
+        #healthText {
+            position: absolute; top: 35px; left: 10px; color: white; font-family: Arial;
+        }
+        #message {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: white; font-family: Arial; font-size: 48px; text-align: center; display: none;
+        }
     </style>
 </head>
 <body>
@@ -21,7 +34,7 @@
     <script>
         window.onload = function() {
             const scene = new THREE.Scene();
-            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.5, 50);
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 50);
             const renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setClearColor(0x000000, 1);
@@ -30,19 +43,27 @@
             renderer.domElement.addEventListener('click', () => {
                 renderer.domElement.requestPointerLock();
                 renderer.domElement.focus();
-                console.log("Canvas clicked, pointer locked");
             });
             document.addEventListener('pointerlockchange', () => {
                 if (document.pointerLockElement === renderer.domElement) console.log("Mouse locked!");
             });
 
-            const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x555555, side: THREE.DoubleSide });
-            const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
+            const wallTexture = new THREE.TextureLoader().load('wall-texture.jpg');
+            const floorTexture = new THREE.TextureLoader().load('floor-texture.jpg');
+            const enemyTexture = new THREE.TextureLoader().load('EnemyFuzzyGrayAlien.png');
+            const shotTexture = new THREE.TextureLoader().load('shot.png');
+            const healthTexture = new THREE.TextureLoader().load('PowerupHealth.png');
+            const exitTexture = new THREE.TextureLoader().load('exit-door.png');
+
+            wallTexture.wrapS = wallTexture.wrapT = THREE.RepeatWrapping;
+
+            const wallMaterial = new THREE.MeshBasicMaterial({ map: wallTexture, side: THREE.DoubleSide });
+            const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
             const ceilingMaterial = new THREE.MeshBasicMaterial({ color: 0x555555 });
-            const enemyMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
-            const shotMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-            const healthMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-            const exitMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+            const enemyMaterial = new THREE.SpriteMaterial({ map: enemyTexture });
+            const shotMaterial = new THREE.SpriteMaterial({ map: shotTexture });
+            const healthMaterial = new THREE.SpriteMaterial({ map: healthTexture });
+            const exitMaterial = new THREE.SpriteMaterial({ map: exitTexture });
             const debugMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
             const hitMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
 
@@ -63,11 +84,10 @@
 
             const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), floorMaterial);
             floor.rotation.x = -Math.PI / 2;
-            floor.position.y = -0.01;
             scene.add(floor);
             const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), ceilingMaterial);
             ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = 4;
+            ceiling.position.y = 5;
             scene.add(ceiling);
 
             const walls = [];
@@ -110,7 +130,7 @@
                 enemy.scale.set(3, 3, 1);
                 enemy.userData = { health: 50, speed: 0.03 };
                 const hitbox = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2), debugMaterial);
-                hitbox.position.copy(enemy.position);
+                hitbox.position.set(x, 1.5, z);
                 enemy.userData.hitbox = hitbox;
                 enemies.push(enemy);
                 scene.add(enemy);
@@ -143,40 +163,33 @@
                 hitbox.position.copy(shot.position);
                 shot.userData = { 
                     hitbox: hitbox, 
-                    velocity: new THREE.Vector3(-Math.sin(camera.rotation.y), 0, -Math.cos(camera.rotation.y)).normalize().multiplyScalar(0.5) 
+                    velocity: new THREE.Vector3(
+                        -Math.sin(camera.rotation.y),
+                        0,
+                        -Math.cos(camera.rotation.y)
+                    ).normalize().multiplyScalar(0.5) 
                 };
                 shots.push(shot);
                 scene.add(shot);
                 scene.add(hitbox);
             }
 
-            const keys = { w: false, a: false, s: false, d: false, space: false, p: false, o: false };
+            const keys = {};
             let debugLogs = false;
             let gameOver = false;
             document.addEventListener('keydown', (event) => {
                 if (gameOver) return;
-                switch (event.key.toLowerCase()) {
-                    case 'w': keys.w = true; break;
-                    case 'a': keys.a = true; break;
-                    case 's': keys.s = true; break;
-                    case 'd': keys.d = true; break;
-                    case ' ': keys.space = true; break;
-                    case 'p': keys.p = true; break;
-                    case 'o': keys.o = true; break;
+                keys[event.key.toLowerCase()] = true;
+                if (event.key === ' ' && !keys['spacePressed']) {
+                    fireShot();
+                    keys['spacePressed'] = true;
                 }
-                console.log("Key down: ", event.key);
+                if (event.key.toLowerCase() === 'p') debugLogs = !debugLogs;
+                if (event.key.toLowerCase() === 'o') spawnEnemy(camera.position.x + 5, camera.position.z + 5);
             });
             document.addEventListener('keyup', (event) => {
-                switch (event.key.toLowerCase()) {
-                    case 'w': keys.w = false; break;
-                    case 'a': keys.a = false; break;
-                    case 's': keys.s = false; break;
-                    case 'd': keys.d = false; break;
-                    case ' ': keys.space = false; break;
-                    case 'p': keys.p = false; break;
-                    case 'o': keys.o = false; break;
-                }
-                console.log("Key up: ", event.key);
+                keys[event.key.toLowerCase()] = false;
+                if (event.key === ' ') keys['spacePressed'] = false;
             });
             document.addEventListener('mousemove', (event) => {
                 if (document.pointerLockElement === renderer.domElement && !gameOver) {
@@ -184,13 +197,16 @@
                 }
             });
 
-            const raycaster = new THREE.Raycaster();
-            function checkCollisionRaycast(position, direction) {
-                raycaster.set(position, direction);
-                raycaster.near = 0;
-                raycaster.far = 1;
-                const intersects = raycaster.intersectObjects(walls);
-                return intersects.length > 0;
+            function checkCollision(pos, size) {
+                const box = new THREE.Box3().setFromCenterAndSize(pos, size);
+                for (const wall of walls) {
+                    const wallBox = new THREE.Box3().setFromObject(wall);
+                    if (box.intersectsBox(wallBox)) {
+                        if (debugLogs) console.log("Collision with wall at: ", wall.position);
+                        return true;
+                    }
+                }
+                return false;
             }
 
             const messageDiv = document.getElementById('message');
@@ -205,35 +221,35 @@
                 if (gameOver) return;
                 requestAnimationFrame(animate);
 
-                if (document.pointerLockElement === renderer.domElement) renderer.domElement.focus();
-
                 const moveSpeed = 0.2;
                 let newX = camera.position.x;
                 let newZ = camera.position.z;
-                let direction = new THREE.Vector3();
-                if (keys.w) direction.set(-Math.sin(camera.rotation.y), 0, -Math.cos(camera.rotation.y));
-                if (keys.s) direction.set(Math.sin(camera.rotation.y), 0, Math.cos(camera.rotation.y));
-                if (keys.a) direction.set(Math.cos(camera.rotation.y), 0, -Math.sin(camera.rotation.y));
-                if (keys.d) direction.set(-Math.cos(camera.rotation.y), 0, Math.sin(camera.rotation.y));
-                if (direction.length() > 0) {
-                    direction.normalize();
-                    newX += direction.x * moveSpeed;
-                    newZ += direction.z * moveSpeed;
-                    if (!checkCollisionRaycast(new THREE.Vector3(camera.position.x, 1.5, camera.position.z), direction)) {
-                        camera.position.x = newX;
-                        camera.position.z = newZ;
-                        playerHitbox.position.set(newX, 1.5, newZ);
-                    }
+                if (keys['w']) {
+                    newZ -= moveSpeed * Math.cos(camera.rotation.y);
+                    newX -= moveSpeed * Math.sin(camera.rotation.y);
                 }
-                if (keys.space && !gameOver) { fireShot(); keys.space = false; }
-                if (keys.p) { debugLogs = !debugLogs; keys.p = false; }
-                if (keys.o) { spawnEnemy(camera.position.x + 5, camera.position.z + 5); keys.o = false; }
+                if (keys['s']) {
+                    newZ += moveSpeed * Math.cos(camera.rotation.y);
+                    newX += moveSpeed * Math.sin(camera.rotation.y);
+                }
+                if (keys['a']) {
+                    newZ += moveSpeed * Math.sin(camera.rotation.y);
+                    newX -= moveSpeed * Math.cos(camera.rotation.y);
+                }
+                if (keys['d']) {
+                    newZ -= moveSpeed * Math.sin(camera.rotation.y);
+                    newX += moveSpeed * Math.cos(camera.rotation.y);
+                }
+                // Collision disabled here - you could walk through walls
+                camera.position.x = newX;
+                camera.position.z = newZ;
+                playerHitbox.position.set(newX, 1.5, newZ);
 
                 enemies.forEach(enemy => {
                     const dir = camera.position.clone().sub(enemy.position).normalize();
                     const newX = enemy.position.x + dir.x * enemy.userData.speed;
                     const newZ = enemy.position.z + dir.z * enemy.userData.speed;
-                    if (!checkCollisionRaycast(enemy.position, dir)) {
+                    if (!checkCollision(new THREE.Vector3(newX, 1.5, newZ), new THREE.Vector3(2, 3, 2))) {
                         enemy.position.x = newX;
                         enemy.position.z = newZ;
                         enemy.userData.hitbox.position.copy(enemy.position);
